@@ -62,16 +62,23 @@ const DrawingCanvas = ({
 
   // Draw arrow shape
   const drawArrow = useCallback((ctx, shape) => {
-    const { x, y, width, height } = shape;
-    const centerY = y + height / 2;
-    
+    const { start, end } = shape;
+    if (!start || !end) return;
     ctx.beginPath();
-    ctx.moveTo(x, centerY);
-    ctx.lineTo(x + width * 0.7, centerY);
-    const arrowSize = Math.min(width, height) * 0.2;
-    ctx.lineTo(x + width * 0.7 - arrowSize, centerY - arrowSize);
-    ctx.moveTo(x + width * 0.7, centerY);
-    ctx.lineTo(x + width * 0.7 - arrowSize, centerY + arrowSize);
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.stroke();
+
+    // Draw arrowhead
+    const headlen = 15;
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const angle = Math.atan2(dy, dx);
+    ctx.beginPath();
+    ctx.moveTo(end.x, end.y);
+    ctx.lineTo(end.x - headlen * Math.cos(angle - Math.PI / 6), end.y - headlen * Math.sin(angle - Math.PI / 6));
+    ctx.lineTo(end.x - headlen * Math.cos(angle + Math.PI / 6), end.y - headlen * Math.sin(angle + Math.PI / 6));
+    ctx.lineTo(end.x, end.y);
     ctx.stroke();
   }, []);
 
@@ -195,18 +202,30 @@ const redrawCanvas = useCallback(() => {
       setTextInput('');
     } else if (currentTool.startsWith('shape-')) {
       const shapeType = currentTool.replace('shape-', '');
-      const newShape = {
-        id: Date.now(),
-        type: shapeType,
-        x: pos.x,
-        y: pos.y,
-        width: 0,
-        height: 0,
-        color: strokeColor,
-        strokeWidth: strokeWidth,
-        fillColor: 'transparent'
-      };
-      setShapes(prev => [...prev, newShape]);
+      if (shapeType === 'arrow') {
+        const newShape = {
+          id: Date.now(),
+          type: 'arrow',
+          start: { x: pos.x, y: pos.y },
+          end: { x: pos.x, y: pos.y },
+          color: strokeColor,
+          strokeWidth: strokeWidth
+        };
+        setShapes(prev => [...prev, newShape]);
+      } else {
+        const newShape = {
+          id: Date.now(),
+          type: shapeType,
+          x: pos.x,
+          y: pos.y,
+          width: 0,
+          height: 0,
+          color: strokeColor,
+          strokeWidth: strokeWidth,
+          fillColor: 'transparent'
+        };
+        setShapes(prev => [...prev, newShape]);
+      }
     }
   };
 
@@ -227,9 +246,14 @@ const redrawCanvas = useCallback(() => {
       setShapes(prev => {
         const newShapes = [...prev];
         const lastShape = newShapes[newShapes.length - 1];
-        if (lastShape && lastShape.type === currentTool.replace('shape-', '')) {
-          lastShape.width = pos.x - lastShape.x;
-          lastShape.height = pos.y - lastShape.y;
+        const shapeType = currentTool.replace('shape-', '');
+        if (lastShape && lastShape.type === shapeType) {
+          if (shapeType === 'arrow') {
+            lastShape.end = { x: pos.x, y: pos.y };
+          } else {
+            lastShape.width = pos.x - lastShape.x;
+            lastShape.height = pos.y - lastShape.y;
+          }
         }
         return newShapes;
       });
