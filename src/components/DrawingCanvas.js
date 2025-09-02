@@ -10,15 +10,55 @@ const DrawingCanvas = ({
   onHistoryUpdate 
 }) => {
   const canvasRef = useRef(null);
+  const recorderRef = useRef(null); // MediaRecorder reference
   const [isDrawing, setIsDrawing] = useState(false);
   const [shapes, setShapes] = useState([]);
-
-
-
+  const [isRecording, setIsRecording] = useState(false);
+  const [videoURL, setVideoURL] = useState(null);
 
   const [isTextMode, setIsTextMode] = useState(false);
   const [textInput, setTextInput] = useState('');
   const [textPosition, setTextPosition] = useState(null);
+
+  // ----------------- RECORDING FUNCTIONS -----------------
+  const startRecording = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const stream = canvas.captureStream(30); // 30 fps
+    const recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
+
+    let chunks = [];
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
+
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: "video/webm" });
+      const url = URL.createObjectURL(blob);
+      setVideoURL(url);
+
+      // Trigger download
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "canvas-recording.webm";
+      a.click();
+
+      chunks = [];
+    };
+
+    recorder.start();
+    recorderRef.current = recorder;
+    setIsRecording(true);
+  };
+
+  const stopRecording = () => {
+    if (recorderRef.current) {
+      recorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+  // --------------------------------------------------------
 
   // Draw arrow shape
   const drawArrow = useCallback((ctx, shape) => {
@@ -26,16 +66,12 @@ const DrawingCanvas = ({
     const centerY = y + height / 2;
     
     ctx.beginPath();
-    // Arrow line
     ctx.moveTo(x, centerY);
     ctx.lineTo(x + width * 0.7, centerY);
-    
-    // Arrow head
     const arrowSize = Math.min(width, height) * 0.2;
     ctx.lineTo(x + width * 0.7 - arrowSize, centerY - arrowSize);
     ctx.moveTo(x + width * 0.7, centerY);
     ctx.lineTo(x + width * 0.7 - arrowSize, centerY + arrowSize);
-    
     ctx.stroke();
   }, []);
 
@@ -60,7 +96,6 @@ const DrawingCanvas = ({
       ctx.font = `${shape.fontSize || 16}px Arial`;
       ctx.fillText(shape.text, shape.x, shape.y);
     } else {
-      // Apply rotation for shapes
       if (shape.rotation) {
         const centerX = shape.x + shape.width / 2;
         const centerY = shape.y + shape.height / 2;
@@ -89,63 +124,42 @@ const DrawingCanvas = ({
     ctx.restore();
   }, [drawArrow]);
 
+
   // Redraw canvas with current state
-  const redrawCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw all shapes
-    shapes.forEach(shape => {
-      drawShape(ctx, shape);
-    });
-    
+const redrawCanvas = useCallback(() => {
+  const canvas = canvasRef.current;
+  const ctx = canvas.getContext('2d');
 
-    
+  // ✅ Fill background with white
+  ctx.fillStyle = "white";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  }, [shapes, drawShape]);
+  // Then draw shapes
+  shapes.forEach(shape => {
+    drawShape(ctx, shape);
+  });
+}, [shapes, drawShape]);
 
   // Initialize canvas
   useEffect(() => {
     const canvas = canvasRef.current;
-    
-    // Set canvas size
     const resizeCanvas = () => {
       const container = canvas.parentElement;
       canvas.width = container.clientWidth;
       canvas.height = container.clientHeight;
-      
-      // Redraw everything
       redrawCanvas();
     };
-
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
-    
     return () => window.removeEventListener('resize', resizeCanvas);
   }, [redrawCanvas]);
 
-
-
-
-
-  // Get mouse position relative to canvas
+  // Mouse event helpers
   const getMousePos = (e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    };
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
-
-
-
-
-
-
 
   // Mouse event handlers
   const handleMouseDown = (e) => {
@@ -162,34 +176,24 @@ const DrawingCanvas = ({
       };
       setShapes(prev => [...prev, newShape]);
     } else if (currentTool === 'eraser') {
-      // Erase shapes at this position - simple point-based erasing
       setShapes(prev => prev.filter(shape => {
         if (shape.type === 'pen') {
-          // For pen strokes, check if point is near any line segment
           for (let i = 0; i < shape.points.length - 1; i++) {
             const p1 = shape.points[i];
-            const p2 = shape.points[i + 1];
-            const distance = Math.sqrt(
-              Math.pow(pos.x - p1.x, 2) + Math.pow(pos.y - p1.y, 2)
-            );
-            if (distance < shape.strokeWidth + 10) {
-              return false; // Remove this shape
-            }
+            const distance = Math.sqrt(Math.pow(pos.x - p1.x, 2) + Math.pow(pos.y - p1.y, 2));
+            if (distance < shape.strokeWidth + 10) return false;
           }
-          return true; // Keep this shape
+          return true;
         } else {
-          // For other shapes, check if point is inside bounding box
           return !(pos.x >= shape.x && pos.x <= shape.x + shape.width &&
                    pos.y >= shape.y && pos.y <= shape.y + shape.height);
         }
       }));
     } else if (currentTool === 'text') {
-      // Start text input mode
       setIsTextMode(true);
       setTextPosition(pos);
       setTextInput('');
     } else if (currentTool.startsWith('shape-')) {
-      // Start drawing a shape
       const shapeType = currentTool.replace('shape-', '');
       const newShape = {
         id: Date.now(),
@@ -208,7 +212,6 @@ const DrawingCanvas = ({
 
   const handleMouseMove = (e) => {
     if (!isDrawing) return;
-
     const pos = getMousePos(e);
 
     if (currentTool === 'pen') {
@@ -235,19 +238,16 @@ const DrawingCanvas = ({
 
   const handleMouseUp = () => {
     setIsDrawing(false);
-    
-    // Update history after any change
     if (shapes.length > 0) {
       onHistoryUpdate([...shapes]);
     }
   };
 
   const handleMouseLeave = () => {
-    // Stop all interactions when mouse leaves canvas
     setIsDrawing(false);
   };
 
-  // Handle text input completion
+  // Text submit/cancel
   const handleTextSubmit = useCallback(() => {
     if (textInput.trim() && textPosition) {
       const newTextShape = {
@@ -257,7 +257,7 @@ const DrawingCanvas = ({
         x: textPosition.x,
         y: textPosition.y,
         color: strokeColor,
-        fontSize: strokeWidth * 4 + 8 // Scale font size with stroke width
+        fontSize: strokeWidth * 4 + 8
       };
       setShapes(prev => [...prev, newTextShape]);
       onHistoryUpdate([...shapes, newTextShape]);
@@ -267,37 +267,28 @@ const DrawingCanvas = ({
     setTextPosition(null);
   }, [textInput, textPosition, strokeColor, strokeWidth, shapes, onHistoryUpdate]);
 
-  // Handle text input cancellation
   const handleTextCancel = useCallback(() => {
     setIsTextMode(false);
     setTextInput('');
     setTextPosition(null);
   }, []);
 
-  // Handle keyboard shortcuts
+  // Keyboard shortcuts for text
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (isTextMode) {
-        if (e.key === 'Enter') {
-          handleTextSubmit();
-        } else if (e.key === 'Escape') {
-          handleTextCancel();
-        }
-        return;
+        if (e.key === 'Enter') handleTextSubmit();
+        else if (e.key === 'Escape') handleTextCancel();
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isTextMode, handleTextSubmit, handleTextCancel]);
 
-  // Update shapes when history changes (for undo/redo)
+  // Sync history for undo/redo
   useEffect(() => {
-    if (historyIndex === -1) {
-      setShapes([]); // Clear canvas
-    } else if (history && history[historyIndex]) {
-      setShapes([...history[historyIndex]]);
-    }
+    if (historyIndex === -1) setShapes([]);
+    else if (history && history[historyIndex]) setShapes([...history[historyIndex]]);
   }, [history, historyIndex]);
 
   // Redraw when shapes change
@@ -305,9 +296,6 @@ const DrawingCanvas = ({
     redrawCanvas();
   }, [shapes, redrawCanvas]);
 
-
-
-  // Get cursor class based on current tool and state
   const getCursorClass = () => {
     if (currentTool === 'pen') return 'pen-cursor';
     if (currentTool === 'eraser') return 'eraser-cursor';
@@ -317,6 +305,14 @@ const DrawingCanvas = ({
   };
 
   return (
+    <div className="drawing-canvas-wrapper">
+      <div className="record-controls">
+        {!isRecording ? (
+          <button onClick={startRecording} className="record-btn">Start Recording</button>
+        ) : (
+          <button onClick={stopRecording} className="stop-btn">Stop Recording</button>
+        )}
+      </div>
     <div className="drawing-canvas-container">
       <canvas
         ref={canvasRef}
@@ -326,7 +322,10 @@ const DrawingCanvas = ({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
       />
+
+      {/* Recording buttons */}
       
+
       {/* Text input overlay */}
       {isTextMode && textPosition && (
         <div
@@ -343,11 +342,8 @@ const DrawingCanvas = ({
             value={textInput}
             onChange={(e) => setTextInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleTextSubmit();
-              } else if (e.key === 'Escape') {
-                handleTextCancel();
-              }
+              if (e.key === 'Enter') handleTextSubmit();
+              else if (e.key === 'Escape') handleTextCancel();
             }}
             placeholder="Enter text..."
             autoFocus
@@ -370,6 +366,7 @@ const DrawingCanvas = ({
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 };
