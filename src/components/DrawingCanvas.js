@@ -329,7 +329,15 @@ const DrawingCanvas = ({
       
       {/* Text input overlay */}
       {isTextMode && textPosition && (
-        <div className="text-input-overlay">
+        <div
+          className="text-input-overlay"
+          style={{
+            position: 'absolute',
+            left: textPosition.x + 160,
+            top: textPosition.y + 100,
+            zIndex: 1000
+          }}
+        >
           <input
             type="text"
             value={textInput}
@@ -344,9 +352,8 @@ const DrawingCanvas = ({
             placeholder="Enter text..."
             autoFocus
             style={{
-              position: 'absolute',
-              left: textPosition.x,
-              top: textPosition.y - 20,
+              width: '150px',
+              height: '40px',
               border: '2px solid #007bff',
               borderRadius: '4px',
               padding: '4px 8px',
@@ -354,7 +361,7 @@ const DrawingCanvas = ({
               color: strokeColor,
               backgroundColor: 'white',
               outline: 'none',
-              zIndex: 1000
+              zIndex: 1001
             }}
           />
           <div className="text-input-buttons">
