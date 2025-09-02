@@ -1,0 +1,97 @@
+.drawing-canvas-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #fff;
+  border: 2px solid #d1d5db;
+  margin: 0;
+  border-radius: 18px;
+  box-shadow: 0 4px 32px rgba(60, 60, 120, 0.10);
+  overflow: hidden;
+  min-width: 900px;
+  min-height: 600px;
+  max-width: 1200px;
+  max-height: 85vh;
+}
+
+.drawing-canvas {
+  cursor: crosshair;
+  background-color: #fff;
+  border-radius: 12px;
+  transition: cursor 0.1s ease;
+  width: 100%;
+  height: 100%;
+  box-shadow: 0 2px 16px rgba(60, 60, 120, 0.08);
+}
+
+.drawing-canvas:hover {
+  cursor: crosshair;
+}
+
+.drawing-canvas.pen-cursor {
+  cursor: crosshair;
+}
+
+.drawing-canvas.eraser-cursor {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><rect x="2" y="2" width="16" height="16" fill="white" stroke="black" stroke-width="1"/></svg>') 10 10, auto;
+}
+
+.drawing-canvas.shape-cursor {
+  cursor: crosshair;
+}
+
+.drawing-canvas.select-cursor {
+  cursor: default;
+}
+
+.drawing-canvas.move-cursor {
+  cursor: move;
+}
+
+.drawing-canvas.resize-cursor {
+  cursor: nw-resize;
+}
+
+.drawing-canvas.text-cursor {
+  cursor: text;
+}
+
+.text-input-overlay {
+  position: relative;
+  pointer-events: auto;
+}
+
+.text-input-buttons {
+  position: absolute;
+  top: -30px;
+  left: 0;
+  display: flex;
+  gap: 4px;
+}
+
+.text-submit-btn, .text-cancel-btn {
+  width: 24px;
+  height: 24px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.text-submit-btn:hover {
+  background: #28a745;
+  color: white;
+  border-color: #28a745;
+}
+
+.text-cancel-btn:hover {
+  background: #dc3545;
+  color: white;
+  border-color: #dc3545;
+}
